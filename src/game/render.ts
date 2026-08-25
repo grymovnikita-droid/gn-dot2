@@ -78,9 +78,14 @@ export class Renderer {
 
     const custom = getSprite(TERRAIN_KEY);
     if (custom) {
-      g.drawImage(custom as CanvasImageSource, 0, 0, WORLD, WORLD);
-      this.bakeOverlays(g);
-      return cv;
+      try {
+        g.imageSmoothingEnabled = true;
+        g.drawImage(custom as CanvasImageSource, 0, 0, WORLD, WORLD);
+        this.bakeOverlays(g);
+        return cv;
+      } catch {
+        // битая картинка — рисуем стандартный ландшафт
+      }
     }
 
     const lg = g.createLinearGradient(0, WORLD, WORLD, 0);

@@ -23,7 +23,13 @@ export function subscribeSprites(fn: (key: string) => void): () => void {
 }
 
 function emit(key: string) {
-  listeners.forEach((l) => l(key));
+  listeners.forEach((l) => {
+    try {
+      l(key);
+    } catch {
+      /* один упавший подписчик не должен ломать остальных */
+    }
+  });
 }
 
 export const TERRAIN_KEY = "terrain";
@@ -34,7 +40,21 @@ export function getSprite(key: string): SpriteSource | null {
 
 export function getSpriteURL(key: string): string | null {
   const s = store.get(key);
-  return s ? (s as HTMLCanvasElement).toDataURL() : null;
+  if (!s) return null;
+  if (s instanceof HTMLCanvasElement) return s.toDataURL();
+  if (s instanceof HTMLImageElement) {
+    // превращаем картинку в dataURL (blob-URL мог быть отозван)
+    const w = s.naturalWidth || 96;
+    const h = s.naturalHeight || 96;
+    const cv = document.createElement("canvas");
+    cv.width = w;
+    cv.height = h;
+    const g = cv.getContext("2d");
+    if (!g) return null;
+    g.drawImage(s, 0, 0);
+    return cv.toDataURL();
+  }
+  return null;
 }
 
 export function setSprite(key: string, img: HTMLImageElement) {

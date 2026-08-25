@@ -129,16 +129,32 @@ export interface TowerSpot {
 
 export const TOWER_SPOTS: TowerSpot[] = (() => {
   const arr: TowerSpot[] = [];
-  // доли пути от СВОЕЙ базы: Т1 — крайняя (у реки), Т2 — середина, Т3 — внутренняя (у базы)
-  const fr = [0.78, 0.56, 0.34];
+  // Доли пути от СВОЕЙ базы до РЕКИ (диагональ y=x — середина карты):
+  // Т1 — передний край у реки, Т2 — середина, Т3 — у своей базы.
+  // Все вышки команды стоят строго на её половине карты.
+  const FR = [0.75, 0.5, 0.27];
   for (const team of ["radiant", "dire"] as Team[]) {
-    // направление "к своему углу" — туда откладываем вышку от дороги
+    // направление "глубже на свою половину" — туда откладываем вышку от дороги
     const side: Vec = team === "radiant" ? { x: -1, y: 1 } : { x: 1, y: -1 };
     for (let lane = 0; lane < 3; lane++) {
       const pts = team === "radiant" ? LANES[lane] : [...LANES[lane]].reverse();
-      fr.forEach((t, i) => {
-        const { p, dir } = pointAlongDir(pts, t);
-        // перпендикуляр к дороге, развёрнутый в сторону своей базы
+      const total = polyLength(pts);
+      // расстояние вдоль линии от своей базы до пересечения с рекой
+      let crossDist = total;
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i - 1];
+        const b = pts[i];
+        const fa = a.y - a.x; // с какой стороны диагонали точка
+        const fb = b.y - b.x;
+        if ((fa >= 0 && fb <= 0) || (fa <= 0 && fb >= 0)) {
+          const k = fa === fb ? 0.5 : fa / (fa - fb);
+          crossDist = polyLength(pts.slice(0, i)) + k * Math.hypot(b.x - a.x, b.y - a.y);
+          break;
+        }
+      }
+      FR.forEach((t, i) => {
+        const { p, dir } = pointAlongDir(pts, (t * crossDist) / total);
+        // перпендикуляр к дороге, развёрнутый на свою половину
         let px = -dir.y;
         let py = dir.x;
         if (px * side.x + py * side.y < 0) {
@@ -149,7 +165,7 @@ export const TOWER_SPOTS: TowerSpot[] = (() => {
           team,
           lane,
           tier: i + 1,
-          pos: { x: p.x + px * 125, y: p.y + py * 125 },
+          pos: { x: p.x + px * 120, y: p.y + py * 120 },
         });
       });
     }

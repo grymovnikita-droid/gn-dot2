@@ -197,8 +197,8 @@ export default function HUD({ hud, shopOpen, onToggleShop, onToggleWorkshop, onA
       <TeamPanel team="radiant" cards={hud.teams.radiant} />
       <TeamPanel team="dire" cards={hud.teams.dire} />
 
-      {/* килл-фид */}
-      <div className="absolute right-4 top-12 flex w-[300px] flex-col items-end gap-1">
+      {/* килл-фид — под панелями команд, чтобы не налезал на иконки */}
+      <div className="absolute right-4 top-[122px] flex w-[300px] flex-col items-end gap-1">
         {hud.feed.map((f) => (
           <div key={f.id} className="feed-in rounded-sm border border-[#2a3428] bg-[#0c120d]/85 px-3 py-1 text-[12.5px] font-bold" style={{ color: f.tint, opacity: Math.min(1, f.ttl / 0.8) }}>
             {f.text}
