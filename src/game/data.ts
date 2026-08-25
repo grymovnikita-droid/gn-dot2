@@ -95,6 +95,31 @@ export function pointAlong(pts: Vec[], t: number): Vec {
   return pts[pts.length - 1];
 }
 
+// точка на полилинии + направление сегмента (для вышек сбоку от дороги)
+export function pointAlongDir(pts: Vec[], t: number): { p: Vec; dir: Vec } {
+  const total = polyLength(pts);
+  let need = t * total;
+  for (let i = 1; i < pts.length; i++) {
+    const dx = pts[i].x - pts[i - 1].x;
+    const dy = pts[i].y - pts[i - 1].y;
+    const seg = Math.hypot(dx, dy);
+    if (need <= seg) {
+      const k = need / seg;
+      return {
+        p: { x: pts[i - 1].x + dx * k, y: pts[i - 1].y + dy * k },
+        dir: { x: dx / (seg || 1), y: dy / (seg || 1) },
+      };
+    }
+    need -= seg;
+  }
+  const a = pts[pts.length - 2] ?? pts[pts.length - 1];
+  const b = pts[pts.length - 1];
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const seg = Math.hypot(dx, dy) || 1;
+  return { p: { ...b }, dir: { x: dx / seg, y: dy / seg } };
+}
+
 export interface TowerSpot {
   team: Team;
   lane: number;
@@ -104,22 +129,27 @@ export interface TowerSpot {
 
 export const TOWER_SPOTS: TowerSpot[] = (() => {
   const arr: TowerSpot[] = [];
-  const off: Record<Team, Vec> = { radiant: { x: -130, y: -130 }, dire: { x: 130, y: 130 } };
-  const R: Record<Team, Vec> = {
-    radiant: { x: Math.SQRT1_2, y: -Math.SQRT1_2 },
-    dire: { x: -Math.SQRT1_2, y: Math.SQRT1_2 },
-  };
-  const fr = [0.32, 0.56, 0.78];
+  // доли пути от СВОЕЙ базы: Т1 — крайняя (у реки), Т2 — середина, Т3 — внутренняя (у базы)
+  const fr = [0.78, 0.56, 0.34];
   for (const team of ["radiant", "dire"] as Team[]) {
+    // направление "к своему углу" — туда откладываем вышку от дороги
+    const side: Vec = team === "radiant" ? { x: -1, y: 1 } : { x: 1, y: -1 };
     for (let lane = 0; lane < 3; lane++) {
       const pts = team === "radiant" ? LANES[lane] : [...LANES[lane]].reverse();
       fr.forEach((t, i) => {
-        const base = pointAlong(pts, t);
+        const { p, dir } = pointAlongDir(pts, t);
+        // перпендикуляр к дороге, развёрнутый в сторону своей базы
+        let px = -dir.y;
+        let py = dir.x;
+        if (px * side.x + py * side.y < 0) {
+          px = -px;
+          py = -py;
+        }
         arr.push({
           team,
           lane,
           tier: i + 1,
-          pos: { x: base.x + off[team].x + R[team].x * 10, y: base.y + off[team].y + R[team].y * 10 },
+          pos: { x: p.x + px * 125, y: p.y + py * 125 },
         });
       });
     }
