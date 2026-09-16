@@ -94,7 +94,10 @@ export default function GameView({ heroId, setup, net, onExit }: { heroId: strin
     const rd = new Renderer(en, cv);
     engineRef.current = en;
     rendererRef.current = rd;
+    
+    // Вызываем resize сразу и с задержкой, чтобы canvas успел получить размеры
     rd.resize();
+    setTimeout(() => rd.resize(), 100);
 
     if (isHost && net) {
       net.session.ev.onCmd = (d) => en.remoteCmd(d as NetCmd);
@@ -272,6 +275,9 @@ export default function GameView({ heroId, setup, net, onExit }: { heroId: strin
     
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
+    
+    // Отладка
+    console.log('Click:', { sx, sy, viewW: rd.viewW, viewH: rd.viewH, camera: en.camera, zoom: en.zoom });
     const isRightClick = e.button === 2;
     const isLeftClick = e.button === 0;
 
@@ -354,7 +360,7 @@ export default function GameView({ heroId, setup, net, onExit }: { heroId: strin
     <div className="relative h-screen w-screen overflow-hidden bg-[#0b100d]">
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 cursor-crosshair"
+        className="absolute inset-0 w-full h-full cursor-crosshair"
         onMouseMove={handleMouseMove}
         onMouseDown={handleMouseDown}
         onContextMenu={(e) => e.preventDefault()}

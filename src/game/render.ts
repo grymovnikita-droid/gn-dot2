@@ -50,19 +50,23 @@ export class Renderer {
 
   resize() {
     const dpr = Math.min(1.5, window.devicePixelRatio || 1);
-    this.viewW = window.innerWidth;
-    this.viewH = window.innerHeight;
+    // Используем реальные размеры canvas, а не окна
+    this.viewW = this.cv.clientWidth || window.innerWidth;
+    this.viewH = this.cv.clientHeight || window.innerHeight;
     this.cv.width = this.viewW * dpr;
     this.cv.height = this.viewH * dpr;
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    console.log('resize:', { viewW: this.viewW, viewH: this.viewH, clientWidth: this.cv.clientWidth, clientHeight: this.cv.clientHeight, dpr });
   }
 
   screenToWorld(sx: number, sy: number): Vec {
     const z = this.engine.zoom;
-    return {
+    const result = {
       x: (sx - this.viewW / 2) / z + this.engine.camera.x,
       y: (sy - this.viewH / 2) / z + this.engine.camera.y,
     };
+    console.log('screenToWorld:', { sx, sy, viewW: this.viewW, viewH: this.viewH, zoom: z, camera: this.engine.camera, result });
+    return result;
   }
 
   // ---------- ландшафт ----------
