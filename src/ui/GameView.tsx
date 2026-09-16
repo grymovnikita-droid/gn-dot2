@@ -253,15 +253,25 @@ export default function GameView({ heroId, setup, net, onExit }: { heroId: strin
 
   const handleMouseMove = (e: React.MouseEvent) => {
     const rd = rendererRef.current;
-    if (rd) rd.mouseWorld = rd.screenToWorld(e.clientX, e.clientY);
+    if (rd) {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (rect) {
+        rd.mouseWorld = rd.screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+      }
+    }
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
     const en = engineRef.current;
     const rd = rendererRef.current;
     if (!en || !rd) return;
-    const sx = e.clientX;
-    const sy = e.clientY;
+    
+    // Получаем координаты относительно canvas
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
     const isRightClick = e.button === 2;
     const isLeftClick = e.button === 0;
 
