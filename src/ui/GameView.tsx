@@ -94,7 +94,10 @@ export default function GameView({ heroId, setup, net, onExit }: { heroId: strin
     const rd = new Renderer(en, cv);
     engineRef.current = en;
     rendererRef.current = rd;
+    
+    // Вызываем resize сразу и с задержкой, чтобы canvas успел получить размеры
     rd.resize();
+    setTimeout(() => rd.resize(), 100);
 
     if (isHost && net) {
       net.session.ev.onCmd = (d) => en.remoteCmd(d as NetCmd);
@@ -253,16 +256,32 @@ export default function GameView({ heroId, setup, net, onExit }: { heroId: strin
 
   const handleMouseMove = (e: React.MouseEvent) => {
     const rd = rendererRef.current;
-    if (rd) rd.mouseWorld = rd.screenToWorld(e.clientX, e.clientY);
+    if (rd) {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (rect) {
+        rd.mouseWorld = rd.screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+      }
+    }
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
     const en = engineRef.current;
     const rd = rendererRef.current;
     if (!en || !rd) return;
-    const sx = e.clientX;
-    const sy = e.clientY;
+    
+    // Получаем координаты относительно canvas
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    
+    // Отладка
+    console.log('Click:', { sx, sy, viewW: rd.viewW, viewH: rd.viewH, camera: en.camera, zoom: en.zoom });
+    const isRightClick = e.button === 2;
+    const isLeftClick = e.button === 0;
 
+    // миникарта работает на обе кнопки
     const mm = minimapRect(rd.viewW, rd.viewH);
     if (sx >= mm.x - 4 && sx <= mm.x + mm.w + 4 && sy >= mm.y - 4 && sy <= mm.y + mm.h + 4) {
       en.camTarget = { x: clamp(((sx - mm.x) / mm.w) * WORLD, 0, WORLD), y: clamp(((sy - mm.y) / mm.h) * WORLD, 0, WORLD) };
@@ -272,61 +291,63 @@ export default function GameView({ heroId, setup, net, onExit }: { heroId: strin
 
     const world = rd.screenToWorld(sx, sy);
 
-    // выбор цели телепорта
-    const tpSlot = tpSlotRef.current;
-    if (tpSlot !== null) {
-      if (e.button === 2) {
+    // ПКМ — отмена таргетинга/телепорта
+    if (isRightClick) {
+      if (tpSlotRef.current !== null) {
         setTpTargeting(false);
         return;
       }
+      if (targetingRef.current !== null) {
+        setTargeting(null);
+        return;
+      }
+    }
+
+    // ЛКМ — выбор цели телепорта
+    if (isLeftClick && tpSlotRef.current !== null) {
       const s = en.pickStructureAt(world, en.player.team);
       if (s) {
-        if (isGuest) sendCmd("tp", { slot: tpSlot, id: s.id });
-        else en.confirmTp(tpSlot, s.id);
+        if (isGuest) sendCmd("tp", { slot: tpSlotRef.current, id: s.id });
+        else en.confirmTp(tpSlotRef.current, s.id);
         setTpTargeting(false);
         setHud(en.snapshot());
       }
       return;
     }
 
-    const ti = targetingRef.current;
-    if (ti !== null && e.button === 2) {
-      setTargeting(null);
-      return;
-    }
-    if (ti !== null) {
-      resolveTargeting(ti, world);
+    // ЛКМ — выбор цели способности
+    if (isLeftClick && targetingRef.current !== null) {
+      resolveTargeting(targetingRef.current, world);
       setTargeting(null);
       setHud(en.snapshot());
       return;
     }
 
-    // клик по герою — панель разведданных
+    // ПКМ — клик по герою для разведданных (ЛКМ тоже работает)
     const heroUnder = en.pickHeroAt(world);
-    if (heroUnder) {
+    if (heroUnder && isRightClick) {
       en.selectedId = heroUnder.id;
       setHud(en.snapshot());
-      if (heroUnder.team !== en.player.team) {
-        if (isGuest) sendCmd("attack", { id: heroUnder.id });
-        else en.orderAttack(heroUnder.id);
-      }
       return;
     }
 
-    const enemy = en.pickAt(world, en.player.team);
-    if (enemy) {
-      if (isGuest) {
-        sendCmd("attack", { id: enemy.id });
-        en.player.attackTargetId = enemy.id; // локальное кольцо цели
-        en.player.moveTarget = null;
-      } else en.orderAttack(enemy.id);
-    } else {
-      en.selectedId = null;
-      if (isGuest) {
-        sendCmd("move", { x: world.x, y: world.y });
-        en.player.moveTarget = en.clampToWorld(world); // локальная метка пути
-        en.player.attackTargetId = null;
-      } else en.orderMove(world);
+    // ПКМ — движение и атака
+    if (isRightClick) {
+      const enemy = en.pickAt(world, en.player.team);
+      if (enemy) {
+        if (isGuest) {
+          sendCmd("attack", { id: enemy.id });
+          en.player.attackTargetId = enemy.id;
+          en.player.moveTarget = null;
+        } else en.orderAttack(enemy.id);
+      } else {
+        en.selectedId = null;
+        if (isGuest) {
+          sendCmd("move", { x: world.x, y: world.y });
+          en.player.moveTarget = en.clampToWorld(world);
+          en.player.attackTargetId = null;
+        } else en.orderMove(world);
+      }
     }
   };
 
@@ -339,7 +360,7 @@ export default function GameView({ heroId, setup, net, onExit }: { heroId: strin
     <div className="relative h-screen w-screen overflow-hidden bg-[#0b100d]">
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 cursor-crosshair"
+        className="absolute inset-0 w-full h-full cursor-crosshair"
         onMouseMove={handleMouseMove}
         onMouseDown={handleMouseDown}
         onContextMenu={(e) => e.preventDefault()}

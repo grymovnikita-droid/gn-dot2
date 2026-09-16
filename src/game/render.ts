@@ -50,19 +50,23 @@ export class Renderer {
 
   resize() {
     const dpr = Math.min(1.5, window.devicePixelRatio || 1);
-    this.viewW = window.innerWidth;
-    this.viewH = window.innerHeight;
+    // Используем реальные размеры canvas, а не окна
+    this.viewW = this.cv.clientWidth || window.innerWidth;
+    this.viewH = this.cv.clientHeight || window.innerHeight;
     this.cv.width = this.viewW * dpr;
     this.cv.height = this.viewH * dpr;
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    console.log('resize:', { viewW: this.viewW, viewH: this.viewH, clientWidth: this.cv.clientWidth, clientHeight: this.cv.clientHeight, dpr });
   }
 
   screenToWorld(sx: number, sy: number): Vec {
     const z = this.engine.zoom;
-    return {
+    const result = {
       x: (sx - this.viewW / 2) / z + this.engine.camera.x,
       y: (sy - this.viewH / 2) / z + this.engine.camera.y,
     };
+    console.log('screenToWorld:', { sx, sy, viewW: this.viewW, viewH: this.viewH, zoom: z, camera: this.engine.camera, result });
+    return result;
   }
 
   // ---------- ландшафт ----------
@@ -647,17 +651,44 @@ export class Renderer {
         ctx.globalAlpha = 1;
       } else if (f.kind === "ring") {
         const prog = 1 - k;
-        ctx.globalAlpha = k * 0.9;
+        const radius = f.size * (0.2 + prog * 0.8);
+        // Внешнее свечение
+        ctx.globalAlpha = k * 0.4;
         ctx.strokeStyle = f.tint;
+        ctx.lineWidth = 8 + k * 6;
+        ctx.beginPath();
+        ctx.arc(f.x, f.y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        // Основное кольцо
+        ctx.globalAlpha = k * 0.9;
         ctx.lineWidth = 3 + k * 3;
         ctx.beginPath();
-        ctx.arc(f.x, f.y, f.size * (0.2 + prog * 0.8), 0, Math.PI * 2);
+        ctx.arc(f.x, f.y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        // Внутреннее яркое кольцо
+        ctx.globalAlpha = k * 0.6;
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(f.x, f.y, radius * 0.95, 0, Math.PI * 2);
         ctx.stroke();
         ctx.globalAlpha = 1;
       } else if (f.kind === "spark") {
         ctx.globalAlpha = k;
-        ctx.fillStyle = f.tint;
-        ctx.fillRect(f.x - f.size / 2, f.y - f.size / 2, f.size, f.size);
+        // Свечение вокруг частицы
+        const glow = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.size * 2);
+        glow.addColorStop(0, f.tint);
+        glow.addColorStop(0.4, f.tint + "88");
+        glow.addColorStop(1, "transparent");
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(f.x, f.y, f.size * 2, 0, Math.PI * 2);
+        ctx.fill();
+        // Ядро частицы
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.arc(f.x, f.y, f.size * 0.5, 0, Math.PI * 2);
+        ctx.fill();
         ctx.globalAlpha = 1;
       } else {
         ctx.globalAlpha = k;
