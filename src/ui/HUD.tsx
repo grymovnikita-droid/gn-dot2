@@ -419,7 +419,7 @@ export default function HUD({ hud, shopOpen, onToggleShop, onToggleWorkshop, onA
 
       {/* подсказка слева снизу над миникартой */}
       <div className="absolute bottom-[240px] left-4 text-[11px] font-semibold text-[#8a8471]/80">
-        Пробел — камера · Колесо — зум · S — стоп · B — лавка · T — телепорт
+        ПКМ — движение/атака · ЛКМ — выбор цели · S — стоп · B — лавка · T — телепорт
       </div>
     </div>
   );

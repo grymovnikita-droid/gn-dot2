@@ -475,6 +475,7 @@ export class GameEngine {
           id: nid(), team: u.team, kind: "spell", pos: { ...u.pos }, targetId: t.id, point: null,
           speed: 1050, damage: power, splash: 0, tint: def.tint, sourceId: u.id, magic: true, trail: 0,
         });
+        this.fxCastNuke(u.pos.x, u.pos.y, def.tint);
         sfx.nuke();
         return ok();
       }
@@ -485,6 +486,7 @@ export class GameEngine {
           id: nid(), team: u.team, kind: "heal", pos: { ...u.pos }, targetId: t.id, point: null,
           speed: 1000, damage: power, splash: 0, tint: def.tint, sourceId: u.id, magic: false, trail: 0,
         });
+        this.fxCastHeal(u.pos.x, u.pos.y, def.tint);
         return ok();
       }
       case "aoe": {
@@ -494,16 +496,16 @@ export class GameEngine {
           id: nid(), team: u.team, kind: "spell", pos: { ...u.pos }, targetId: null, point: p,
           speed: 850, damage: power, splash: def.radius ?? 280, tint: def.tint, sourceId: u.id, magic: true, trail: 0,
         });
+        this.fxCastAoe(u.pos.x, u.pos.y, def.radius ?? 280, def.tint);
         sfx.nuke();
         return ok();
       }
       case "dash": {
         if (!point) return false;
         const p = this.clampRange(u.pos, point, def.range);
-        this.fxRing(u.pos.x, u.pos.y, 60, def.tint);
+        this.fxCastDash(u.pos.x, u.pos.y, p.x, p.y, def.tint);
         u.pos = p;
         u.moveTarget = null;
-        this.fxRing(p.x, p.y, 70, def.tint);
         return ok();
       }
       case "buff": {
@@ -515,12 +517,12 @@ export class GameEngine {
         }
         const fx = BUFF_FX[u.hero ?? ""] ?? BUFF_FX.akasha;
         for (const b of fx(power, def.tint)) t.buffs.push(b);
-        this.fxRing(t.pos.x, t.pos.y, 70, def.tint);
+        this.fxCastBuff(t.pos.x, t.pos.y, def.tint);
         return ok();
       }
       case "ult_aoe": {
         const radius = def.radius ?? 400;
-        this.fxRing(u.pos.x, u.pos.y, radius, def.tint);
+        this.fxCastUlt(u.pos.x, u.pos.y, radius, def.tint);
         this.shakeIt(6);
         for (const e of this.units) {
           if (e.team === u.team || !isTargetable(e) || isStructure(e)) continue;
@@ -537,7 +539,7 @@ export class GameEngine {
       }
       case "aoeheal": {
         const radius = def.radius ?? 500;
-        this.fxRing(u.pos.x, u.pos.y, radius, def.tint);
+        this.fxCastUlt(u.pos.x, u.pos.y, radius, def.tint);
         this.shakeIt(5);
         for (const e of this.units) {
           if (!isTargetable(e) || dist(u.pos, e.pos) > radius + e.radius) continue;
@@ -851,6 +853,131 @@ export class GameEngine {
 
   fxSlash(x: number, y: number, tint: string) {
     this.effects.push({ kind: "slash", x, y, vx: rand(-20, 20), vy: rand(-30, -10), ttl: 0.22, maxTtl: 0.22, tint, size: rand(18, 30) });
+  }
+
+  // Эффекты кастов способностей
+  fxCastNuke(x: number, y: number, tint: string) {
+    // Концентрированный сгусток энергии
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      const speed = rand(80, 140);
+      this.effects.push({
+        kind: "spark",
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        ttl: 0.4,
+        maxTtl: 0.4,
+        tint,
+        size: rand(3, 6),
+      });
+    }
+    this.effects.push({ kind: "ring", x, y, vx: 0, vy: 0, ttl: 0.3, maxTtl: 0.3, tint, size: 40 });
+  }
+
+  fxCastAoe(x: number, y: number, radius: number, tint: string) {
+    // Взрыв по области
+    for (let i = 0; i < 16; i++) {
+      const angle = (i / 16) * Math.PI * 2;
+      const speed = rand(100, 200);
+      this.effects.push({
+        kind: "spark",
+        x: x + Math.cos(angle) * radius * 0.3,
+        y: y + Math.sin(angle) * radius * 0.3,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        ttl: 0.6,
+        maxTtl: 0.6,
+        tint,
+        size: rand(4, 8),
+      });
+    }
+    this.effects.push({ kind: "ring", x, y, vx: 0, vy: 0, ttl: 0.5, maxTtl: 0.5, tint, size: radius });
+    this.effects.push({ kind: "ring", x, y, vx: 0, vy: 0, ttl: 0.4, maxTtl: 0.4, tint, size: radius * 0.6 });
+  }
+
+  fxCastBuff(x: number, y: number, tint: string) {
+    // Восходящие частицы баффа
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      this.effects.push({
+        kind: "spark",
+        x: x + Math.cos(angle) * 20,
+        y: y + Math.sin(angle) * 20,
+        vx: Math.cos(angle) * 30,
+        vy: -rand(60, 120),
+        ttl: 0.7,
+        maxTtl: 0.7,
+        tint,
+        size: rand(3, 5),
+      });
+    }
+    this.effects.push({ kind: "ring", x, y, vx: 0, vy: 0, ttl: 0.4, maxTtl: 0.4, tint, size: 50 });
+  }
+
+  fxCastHeal(x: number, y: number, tint: string) {
+    // Целительные орбы
+    for (let i = 0; i < 10; i++) {
+      const angle = (i / 10) * Math.PI * 2;
+      this.effects.push({
+        kind: "spark",
+        x: x + Math.cos(angle) * 30,
+        y: y + Math.sin(angle) * 30,
+        vx: Math.cos(angle) * 20,
+        vy: -rand(40, 80),
+        ttl: 0.8,
+        maxTtl: 0.8,
+        tint: "#7de08a",
+        size: rand(4, 7),
+      });
+    }
+    this.effects.push({ kind: "ring", x, y, vx: 0, vy: 0, ttl: 0.5, maxTtl: 0.5, tint, size: 60 });
+  }
+
+  fxCastDash(x: number, y: number, tx: number, ty: number, tint: string) {
+    // След рывка
+    const dx = tx - x;
+    const dy = ty - y;
+    const dist = Math.hypot(dx, dy);
+    const steps = Math.floor(dist / 20);
+    for (let i = 0; i < steps; i++) {
+      const t = i / steps;
+      this.effects.push({
+        kind: "spark",
+        x: x + dx * t,
+        y: y + dy * t,
+        vx: rand(-20, 20),
+        vy: rand(-20, 20),
+        ttl: 0.3 + t * 0.2,
+        maxTtl: 0.5,
+        tint,
+        size: rand(2, 4),
+      });
+    }
+    this.effects.push({ kind: "ring", x: tx, y: ty, vx: 0, vy: 0, ttl: 0.4, maxTtl: 0.4, tint, size: 70 });
+  }
+
+  fxCastUlt(x: number, y: number, radius: number, tint: string) {
+    // Ультимативный взрыв
+    for (let i = 0; i < 24; i++) {
+      const angle = (i / 24) * Math.PI * 2;
+      const speed = rand(150, 280);
+      this.effects.push({
+        kind: "spark",
+        x: x + Math.cos(angle) * radius * 0.2,
+        y: y + Math.sin(angle) * radius * 0.2,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        ttl: 0.8,
+        maxTtl: 0.8,
+        tint,
+        size: rand(5, 10),
+      });
+    }
+    this.effects.push({ kind: "ring", x, y, vx: 0, vy: 0, ttl: 0.7, maxTtl: 0.7, tint, size: radius });
+    this.effects.push({ kind: "ring", x, y, vx: 0, vy: 0, ttl: 0.6, maxTtl: 0.6, tint, size: radius * 0.7 });
+    this.effects.push({ kind: "ring", x, y, vx: 0, vy: 0, ttl: 0.5, maxTtl: 0.5, tint, size: radius * 0.4 });
   }
 
   shakeIt(v: number) {
